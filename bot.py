@@ -12,13 +12,16 @@ from telegram.ext import (
 )
 import yt_dlp
 
+# Logging configuration
 logging.basicConfig(
     format="%(asctime)s - %(name)s - %(levelname)s - %(message)s", level=logging.INFO
 )
 logger = logging.getLogger(__name__)
 
-TOKEN = os.getenv("BOT_TOKEN")
+# Railway Environment Variable မှ သော်လည်းကောင်း၊ Hardcoded Token မှ သော်လည်းကောင်း ဖတ်ယူခြင်း
+TOKEN = os.getenv("BOT_TOKEN", "8552466342:AAEGNebOKjuXgE62oqY_4cfkLSlna8kx8Hw")
 
+# Main Menu Keyboard
 def get_main_menu():
     keyboard = [
         [InlineKeyboardButton("🎬 YouTube", callback_data="menu_yt"), InlineKeyboardButton("🎵 TikTok", callback_data="menu_tt")],
@@ -26,21 +29,26 @@ def get_main_menu():
     ]
     return InlineKeyboardMarkup(keyboard)
 
+# Quality Selection Keyboard
 def get_quality_menu():
     keyboard = [
         [InlineKeyboardButton("🎵 MP3 (Audio)", callback_data="quality_mp3")],
         [InlineKeyboardButton("360p", callback_data="quality_360"), InlineKeyboardButton("480p", callback_data="quality_480")],
-        [InlineKeyboardButton("720p", callback_data="quality_720"), InlineKeyboardButton("1080p", callback_data="quality_1080")]
+        [InlineKeyboardButton("720p", callback_data="quality_720"), InlineKeyboardButton("1080p", callback_data="quality_1080")],
+        [InlineKeyboardButton("2K", callback_data="quality_1440"), InlineKeyboardButton("4K", callback_data="quality_2160")]
     ]
     return InlineKeyboardMarkup(keyboard)
 
+# Command Handler: /start
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_first_name = update.effective_user.first_name
     await update.message.reply_text(
-        f"မင်္ဂလာပါ {user_first_name}! 🤖\n\nVideo သို့မဟုတ် Music ဒေါင်းရန် Link ပို့ပေးပါ:",
+        f"မင်္ဂလာပါ {user_first_name}! 🤖\n\n"
+        "Video သို့မဟုတ် Music ဒေါင်းလုဒ်ဆွဲရန် Link ပေးပို့ပါ သို့မဟုတ် မီနူးမှ ရွေးချယ်ပါ:",
         reply_markup=get_main_menu()
     )
 
+# Callback Query Handler (Buttons)
 async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -49,10 +57,10 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if data.startswith("menu_"):
         if data == "menu_search":
             context.user_data["awaiting_search"] = True
-            await query.edit_message_text("🔍 ရှာဖွေချင်သည့် သီချင်း အမည်ကို ရိုက်ပို့ပေးပါ:")
+            await query.edit_message_text("🔍 ရှာဖွေချင်သည့် သီချင်း အမည် သို့မဟုတ် အနုပညာရှင် ရိုက်ပို့ပေးပါ:")
         else:
             platform = data.split("_")[1].upper()
-            await query.edit_message_text(f"📥 {platform} Link ကို ပေးပို့ပေးပါ။")
+            await query.edit_message_text(f"📥 {platform} Link ကို Telegram သို့ ပေးပို့ပေးပါ။")
 
     elif data.startswith("quality_"):
         quality = data.split("_")[1]
@@ -61,7 +69,7 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
             await query.edit_message_text("❌ Link မရှိတော့ပါ။ Link ပြန်ပို့ပေးပါ။")
             return
 
-        await query.edit_message_text("⏳ Download ပြုလုပ်နေပါသည်... ခေတ္တစောင့်ပေးပါ။")
+        await query.edit_message_text("⏳ Download ပြုလုပ်နေပါသည်... ခေတ္တစောင့်ဆိုင်းပေးပါ။")
         asyncio.create_task(process_download(query, context, url, quality))
 
     elif data.startswith("select_search_"):
@@ -70,12 +78,14 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
         if 0 <= idx < len(results):
             selected = results[idx]
             url = f"https://www.youtube.com/watch?v={selected['id']}"
-            await query.edit_message_text(f"🎵 **{selected['title']}** ကို ဒေါင်းလုဒ်ဆွဲနေပါသည်...")
+            await query.edit_message_text(f"🎵 **{selected['title']}** ကို MP3 အဖြစ် ဒေါင်းလုဒ်ဆွဲနေပါသည်...")
             asyncio.create_task(process_download(query, context, url, "mp3"))
 
+# Text Message Handler
 async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = update.message.text.strip()
 
+    # Search Mode
     if context.user_data.get("awaiting_search"):
         context.user_data["awaiting_search"] = False
         msg = await update.message.reply_text(f"🔍 '{text}' ကို ရှာဖွေနေပါသည်...")
@@ -96,18 +106,20 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
                     title = entry.get('title', 'Unknown')[:35]
                     keyboard.append([InlineKeyboardButton(f"🎵 {title}", callback_data=f"select_search_{idx}")])
                 
-                await msg.edit_text("👇 ဒေါင်းလုဒ်ဆွဲလိုသည့် သီချင်းကို ရွေးပါ:", reply_markup=InlineKeyboardMarkup(keyboard))
+                await msg.edit_text("👇 ဒေါင်းလုဒ်ဆွဲလိုသည့် သီချင်းကို ရွေးချယ်ပါ:", reply_markup=InlineKeyboardMarkup(keyboard))
         except Exception as e:
             logger.error(f"Search error: {e}")
             await msg.edit_text("❌ ရှာဖွေရာတွင် အမှားအယွင်း ရှိနေပါသည်။")
         return
 
+    # Link Processing
     if text.startswith("http://") or text.startswith("https://"):
         context.user_data["pending_url"] = text
         await update.message.reply_text("🎬 Quality သို့မဟုတ် Format ရွေးချယ်ပါ:", reply_markup=get_quality_menu())
     else:
-        await update.message.reply_text("❌ မှန်ကန်သော Link ပေးပို့ပါ။", reply_markup=get_main_menu())
+        await update.message.reply_text("❌ မှန်ကန်သော Link ပေးပို့ပေးပါ သို့မဟုတ် /start ကို နှိပ်ပါ။", reply_markup=get_main_menu())
 
+# Download Processing Logic
 async def process_download(query, context, url, quality):
     chat_id = query.message.chat_id
     loop = asyncio.get_running_loop()
@@ -145,7 +157,7 @@ async def process_download(query, context, url, quality):
         file_size = os.path.getsize(file_path) / (1024 * 1024)
 
         if file_size > 50:
-            await context.bot.send_message(chat_id=chat_id, text="❌ ဖိုင်ဆိုဒ် 50MB ထက်ကြီးသဖြင့် Telegram တွင် တင်၍ မရပါ။")
+            await context.bot.send_message(chat_id=chat_id, text="❌ ဖိုင်ဆိုဒ် 50MB ထက်ကြီးသဖြင့် Telegram API Limit ကြောင့် တင်၍ မရပါ။")
         else:
             await context.bot.send_message(chat_id=chat_id, text="📤 Telegram သို့ တင်ပို့နေပါသည်...")
             with open(file_path, 'rb') as file:
@@ -159,16 +171,15 @@ async def process_download(query, context, url, quality):
 
     except Exception as e:
         logger.error(f"Download Error: {e}")
-        await context.bot.send_message(chat_id=chat_id, text="❌ ဒေါင်းလုဒ်ဆွဲရာတွင် အမှားအယွင်း ဖြစ်ပေါ်ခဲ့ပါသည်။")
+        await context.bot.send_message(chat_id=chat_id, text="❌ ဒေါင်းလုဒ်ဆွဲရာတွင် အမှားအယွင်း ဖြစ်ပေါ်ခဲ့ပါသည်။ (Link မမှန်ပါ သို့မဟုတ် Server Limit ဖြစ်နိုင်ပါသည်)")
 
 def main():
-    if not TOKEN:
-        logger.error("BOT_TOKEN မရှိသေးပါ။ Environment Variable ကို စစ်ဆေးပါ။")
-        return
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
+    
+    logger.info("Bot is running on Railway...")
     application.run_polling()
 
 if __name__ == "__main__":
