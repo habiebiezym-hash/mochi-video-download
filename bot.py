@@ -18,8 +18,8 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Railway Environment Variable မှ သော်လည်းကောင်း၊ Hardcoded Token မှ သော်လည်းကောင်း ဖတ်ယူခြင်း
-TOKEN = os.getenv("BOT_TOKEN", "8552466342:AAEGNebOKjuXgE62oqY_4cfkLSlna8kx8Hw")
+# Environment Variable မှ BOT_TOKEN ကို ဖတ်ယူခြင်း
+TOKEN = os.getenv("BOT_TOKEN")
 
 # Main Menu Keyboard
 def get_main_menu():
@@ -174,12 +174,16 @@ async def process_download(query, context, url, quality):
         await context.bot.send_message(chat_id=chat_id, text="❌ ဒေါင်းလုဒ်ဆွဲရာတွင် အမှားအယွင်း ဖြစ်ပေါ်ခဲ့ပါသည်။ (Link မမှန်ပါ သို့မဟုတ် Server Limit ဖြစ်နိုင်ပါသည်)")
 
 def main():
+    if not TOKEN:
+        logger.error("ERROR: BOT_TOKEN Environment Variable ကို တွေ့ရှိခြင်း မရှိပါ။")
+        return
+
     application = Application.builder().token(TOKEN).build()
     application.add_handler(CommandHandler("start", start))
     application.add_handler(CallbackQueryHandler(button_handler))
     application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_message))
     
-    logger.info("Bot is running on Railway...")
+    logger.info("Bot is running...")
     application.run_polling()
 
 if __name__ == "__main__":
