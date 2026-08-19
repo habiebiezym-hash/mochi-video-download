@@ -89,7 +89,11 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
     if context.user_data.get("awaiting_search"):
         context.user_data["awaiting_search"] = False
         msg = await update.message.reply_text(f"🔍 '{text}' ကို ရှာဖွေနေပါသည်...")
-        ydl_opts = {'extract_flat': True, 'quiet': True}
+        ydl_opts = {
+            'extract_flat': True,
+            'quiet': True,
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}}
+        }
         loop = asyncio.get_running_loop()
         
         try:
@@ -125,19 +129,27 @@ async def process_download(query, context, url, quality):
     loop = asyncio.get_running_loop()
     output_filename = f"dl_{query.message.message_id}"
 
+    # YouTube အပါအဝင် အခြား Platform များအတွက် Anti-Bot Bypass Options
+    common_ydl_opts = {
+        'quiet': True,
+        'no_warnings': True,
+        'user_agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+        'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+    }
+
     if quality == "mp3":
         ydl_opts = {
+            **common_ydl_opts,
             'format': 'bestaudio/best',
             'postprocessors': [{'key': 'FFmpegExtractAudio', 'preferredcodec': 'mp3', 'preferredquality': '192'}],
             'outtmpl': f'{output_filename}.%(ext)s',
-            'quiet': True,
         }
     else:
         ydl_opts = {
+            **common_ydl_opts,
             'format': f'bestvideo[height<={quality}]+bestaudio/best[height<={quality}]/best',
             'outtmpl': f'{output_filename}.%(ext)s',
             'merge_output_format': 'mp4',
-            'quiet': True,
         }
 
     try:
