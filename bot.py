@@ -44,7 +44,7 @@ async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user_first_name = update.effective_user.first_name
     await update.message.reply_text(
         f"မင်္ဂလာပါ {user_first_name}! 🤖\n\n"
-        "Video သို့မဟုတ် Music ဒေါင်းလုဒ်ဆွဲရန် Link ပေးပို့ပါ သို့မဟုတ် မီနူးမှ ရွေးချယ်ပါ:",
+        "မမရေ💖🍓 မမကြိုက်တဲ့ Videoလေးတွေ Download ရပြီနော်။လောလောဆယ်တော့ Tiktok, Facebookပဲရအူးမယ်နော်။မောင်ကြိုးစားပြီးပြင်ပေးမယ်။ချစ်တယ်နော်🍓💖 အာဘွားမွကျိ😘🍓",
         reply_markup=get_main_menu()
     )
 
