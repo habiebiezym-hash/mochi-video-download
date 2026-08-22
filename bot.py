@@ -1,4 +1,3 @@
-
 import os
 import asyncio
 import logging
@@ -23,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 TOKEN = os.getenv("BOT_TOKEN")
 COOKIE_FILE = "cookies.txt"
+ITEMS_PER_PAGE = 10
 
 def get_main_menu():
     keyboard = [
@@ -39,11 +39,41 @@ def get_quality_menu():
     ]
     return InlineKeyboardMarkup(keyboard)
 
+def build_search_keyboard(results, page=0):
+    start_idx = page * ITEMS_PER_PAGE
+    end_idx = start_idx + ITEMS_PER_PAGE
+    page_results = results[start_idx:end_idx]
+    
+    keyboard = []
+    # သီချင်း ခလုတ်များ
+    for idx, entry in enumerate(page_results, start=start_idx):
+        title = entry.get('title', 'Unknown')[:35]
+        keyboard.append([InlineKeyboardButton(f"🎵 {title}", callback_data=f"select_search_{idx}")])
+    
+    # Navigation Buttons (Back | Page Info | Next)
+    total_pages = (len(results) + ITEMS_PER_PAGE - 1) // ITEMS_PER_PAGE
+    nav_row = []
+    
+    if page > 0:
+        nav_row.append(InlineKeyboardButton("◀️ Back", callback_data=f"page_{page - 1}"))
+    else:
+        nav_row.append(InlineKeyboardButton("⛔", callback_data="noop"))
+        
+    nav_row.append(InlineKeyboardButton(f"📄 {page + 1}/{total_pages}", callback_data="noop"))
+    
+    if end_idx < len(results):
+        nav_row.append(InlineKeyboardButton("Next ▶️", callback_data=f"page_{page + 1}"))
+    else:
+        nav_row.append(InlineKeyboardButton("⛔", callback_data="noop"))
+        
+    keyboard.append(nav_row)
+    return InlineKeyboardMarkup(keyboard)
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
     welcome_text = (
-        "မမရေ💖🍓 မမကြိုက်တဲ့ Videoလေးတွေ Download ရပြီနော်။"
-        "လောလောဆယ်တော့ Tiktok, Facebookပဲရအူးမယ်နော်။"
-        "မောင်ကြိုးစားပြီးပြင်ပေးမယ်။ချစ်တယ်နော်🍓💖 အာဘွားမွကျိ😘🍓"
+        "မမရေ💖🍓 မမကြိုက်တဲ့ Videoလေးတွေ Download ရပြီနော်။\n"
+        "လောလောဆယ်တော့ Tiktok, Facebookနဲ့ YouTube Music Search ရပါပြီ။\n"
+        "မောင်ကြိုးစားပြီးပြင်ပေးထားတယ်။ချစ်တယ်နော်🍓💖 အာဘွားမွကျိ😘🍓"
     )
     await update.message.reply_text(
         welcome_text,
@@ -55,13 +85,23 @@ async def button_handler(update: Update, context: ContextTypes.DEFAULT_TYPE):
     await query.answer()
     data = query.data
 
+    if data == "noop":
+        return
+
     if data.startswith("menu_"):
         if data == "menu_search":
             context.user_data["awaiting_search"] = True
-            await query.edit_message_text("🔍 ရှာဖွေချင်သည့် သီချင်း အမည်ကို ရိုက်ပို့ပေးပါ:")
+            await query.edit_message_text("🔍 ရှာဖွေချင်သည့် သီချင်း အမည် သို့မဟုတ် အဆိုတော် အမည်ကို ရိုက်ပို့ပေးပါ:")
         else:
             platform = data.split("_")[1].upper()
             await query.edit_message_text(f"📥 {platform} Link ကို ပေးပို့ပေးပါ။")
+
+    elif data.startswith("page_"):
+        page = int(data.split("_")[1])
+        results = context.user_data.get("search_results", [])
+        if results:
+            reply_markup = build_search_keyboard(results, page)
+            await query.edit_message_text("👇 ဒေါင်းလုဒ်ဆွဲလိုသည့် သီချင်းကို ရွေးပါ:", reply_markup=reply_markup)
 
     elif data.startswith("quality_"):
         quality = data.split("_")[1]
@@ -87,7 +127,7 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
 
     if context.user_data.get("awaiting_search"):
         context.user_data["awaiting_search"] = False
-        msg = await update.message.reply_text(f"🔍 '{text}' ကို ရှာဖွေနေပါသည်...")
+        msg = await update.message.reply_text(f"🔍 '{text}' အတွက် သီချင်းများ ရှာဖွေနေပါသည်...")
         
         ydl_opts = {
             'extract_flat': True, 
@@ -99,20 +139,17 @@ async def handle_message(update: Update, context: ContextTypes.DEFAULT_TYPE):
         loop = asyncio.get_running_loop()
         
         try:
+            # သီချင်းအပုဒ် ၃၀ အထိ ရှာပြီး ၁၀ ပုဒ်စီ စာမျက်နှာခွဲပြမည်
             with yt_dlp.YoutubeDL(ydl_opts) as ydl:
-                info = await loop.run_in_executor(None, lambda: ydl.extract_info(f"ytsearch5:{text}", download=False))
+                info = await loop.run_in_executor(None, lambda: ydl.extract_info(f"ytsearch30:{text}", download=False))
                 entries = info.get('entries', [])
                 if not entries:
                     await msg.edit_text("❌ မည်သည့် သီချင်းမျှ ရှာမတွေ့ပါ။")
                     return
 
                 context.user_data["search_results"] = entries
-                keyboard = []
-                for idx, entry in enumerate(entries):
-                    title = entry.get('title', 'Unknown')[:35]
-                    keyboard.append([InlineKeyboardButton(f"🎵 {title}", callback_data=f"select_search_{idx}")])
-                
-                await msg.edit_text("👇 ဒေါင်းလုဒ်ဆွဲလိုသည့် သီချင်းကို ရွေးပါ:", reply_markup=InlineKeyboardMarkup(keyboard))
+                reply_markup = build_search_keyboard(entries, page=0)
+                await msg.edit_text("👇 ဒေါင်းလုဒ်ဆွဲလိုသည့် သီချင်းကို ရွေးပါ:", reply_markup=reply_markup)
         except Exception as e:
             logger.error(f"Search error: {e}")
             await msg.edit_text("❌ ရှာဖွေရာတွင် အမှားအယွင်း ရှိနေပါသည်။")
